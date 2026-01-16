@@ -1,3 +1,4 @@
+import math
 class Inimigo:
     def __init__(self,x,z,cor,tipoINI="melee"):
         self.x,self.z=x,z

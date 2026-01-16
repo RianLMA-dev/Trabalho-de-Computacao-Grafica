@@ -1,3 +1,5 @@
+import numpy as np
+from OpenGL.GL import *
 def criarCubo(cor=[0.7,0.7,0.7]):
     # cubo com cor aplicada a todos os vértices
     c = cor

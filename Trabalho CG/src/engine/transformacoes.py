@@ -1,3 +1,5 @@
+import math
+import numpy as np
 def perspectiva(fov, aspecto, perto, longe):
     f = 1.0 / math.tan(fov/2)
     M = np.zeros((4,4), dtype=np.float32)

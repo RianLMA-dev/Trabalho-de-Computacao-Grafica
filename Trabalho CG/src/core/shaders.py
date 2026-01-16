@@ -1,3 +1,4 @@
+from OpenGL.GL import *
 def compilarShader(src, stype):
     s = glCreateShader(stype)
     glShaderSource(s, src)

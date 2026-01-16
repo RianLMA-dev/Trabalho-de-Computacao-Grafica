@@ -1,3 +1,4 @@
+from OpenGL.GL import *
 def desenhar(vao_tuple,model,vp,prog):
     vao,vbo,ebo,count = vao_tuple
     mvp = vp @ model
