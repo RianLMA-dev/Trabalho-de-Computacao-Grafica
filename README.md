@@ -135,15 +135,19 @@ src/
 │   └── shaders.py
 │
 ├── engine/
-│   ├── transformacoes.py
+│   ├── colisao.py
 │   ├── geometrias.py
-│   └── colisao.py
+│   └── transformacoes.py
 │
 ├── game/
-│   ├── jogador.py
+│   ├── fase.py
 │   ├── inimigo.py
+│   ├── jogador.py
+│   ├── modelo_blocos.py
+│   ├── modelo_inimigos.py
 │   ├── plataforma.py
-│   └── rampa.py
+│   ├── rampa.py
+│   └── render_utils.py
 │
 └── main.py
 
