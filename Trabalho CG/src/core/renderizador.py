@@ -1,4 +1,6 @@
 from OpenGL.GL import *
+from engine.transformacoes import escala
+from engine.transformacoes import rotacaoY, translacao
 def desenhar(vao_tuple,model,vp,prog):
     vao,vbo,ebo,count = vao_tuple
     mvp = vp @ model
@@ -8,3 +10,4 @@ def desenhar(vao_tuple,model,vp,prog):
     glBindVertexArray(vao)
     glDrawElements(GL_TRIANGLES,count,GL_UNSIGNED_INT,None)
     glBindVertexArray(0)
+

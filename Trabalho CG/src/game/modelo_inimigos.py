@@ -61,8 +61,10 @@ class ModeloInimigos:
         desenhar_fn(self.vao_madeira, baixo, vp, prog)
 
         # “pontas” do arco (um pouco pra frente)
-        ponta_cima = arco_base @ translacao(0.0, 0.80, 0.05) @ escala(0.14, 0.12, 0.14)
-        ponta_baixo = arco_base @ translacao(0.0, -0.80, 0.05) @ escala(0.14, 0.12, 0.14)
+        # pontas mais alongadas (Y maior) e um pouco mais "pra frente" (Z)
+        ponta_cima  = arco_base @ translacao(0.0, 0.92, 0.08) @ escala(0.10, 0.26, 0.12)
+        ponta_baixo = arco_base @ translacao(0.0, -0.92, 0.08) @ escala(0.10, 0.26, 0.12)
+
         desenhar_fn(self.vao_madeira, ponta_cima, vp, prog)
         desenhar_fn(self.vao_madeira, ponta_baixo, vp, prog)
 

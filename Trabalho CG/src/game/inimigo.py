@@ -10,6 +10,13 @@ class Inimigo:
         self.tipo = tipoINI
         self.tam = 1.0
         self.vivo = True
+        self.behavior = "chase" if tipoINI=="melee" else "kite"
+        self.burst = 1
+        self.burst_left = 0
+        self.burst_gap = 0.12
+        self.burst_timer = 0.0
+        self.can_shoot = True  # controlado pela main (opportunist)
+
 
         # ---- VIDA (se quiser já começar a usar por mundo)
         self.hp_max = 3 if tipoINI == "melee" else 2
@@ -26,10 +33,10 @@ class Inimigo:
 
         # ---- RANGED (projéteis)
         self.dano_range = 1
-        self.cooldown_atk_range = 1.2
+        self.cooldown_atk_range = 2.0
         self.atk_timer_range = 0.0
         self.flechas_ativas = []
-        self.flecha_speed = 15.0
+        self.flecha_speed = 11.0
         self.flecha_ttl = 2.0
 
     def tomar_dano(self, dano):
@@ -55,6 +62,26 @@ class Inimigo:
             self.atk_timer = self.cooldown_atk
 
     def atacar_ranged(self, player, dt):
+        if not self.can_shoot:
+            return
+        
+        # controla intervalo entre tiros dentro do burst
+        if self.burst_timer > 0:
+            self.burst_timer -= dt
+            return
+
+        # cooldown geral entre bursts
+        if self.atk_timer_range > 0 and self.burst_left == 0:
+            self.atk_timer_range -= dt
+            return
+
+        # trava de segurança pra não virar metralhadora em nenhum mundo
+        self.cooldown_atk_range = max(self.cooldown_atk_range, 1.6)
+        
+        # se não está em burst, inicia um novo
+        if self.burst_left == 0:
+            self.burst_left = max(1, int(self.burst))
+
         if self.atk_timer_range > 0:
             self.atk_timer_range -= dt
             return
@@ -79,7 +106,14 @@ class Inimigo:
                 "tempo_vida": float(self.flecha_ttl),
             }
             self.flechas_ativas.append(nova_flecha)
-            self.atk_timer_range = self.cooldown_atk_range
+            self.burst_left -= 1
+
+            if self.burst_left > 0:
+                # próximo tiro rápido
+                self.burst_timer = self.burst_gap
+            else:
+                # terminou o burst -> entra no cooldown "grande"
+                self.atk_timer_range = self.cooldown_atk_range
 
     def update(self, dt, player):
         if (not self.vivo) or (not player.vivo):
@@ -105,14 +139,16 @@ class Inimigo:
 
         else:  # ranged
             # kiting: manter entre 6 e 10
-            if d > 10.0:
+            if d > 9.0:
                 nx, nz = dx / d, dz / d
                 self.x += nx * self.veloc * dt
                 self.z += nz * self.veloc * dt
-            elif d < 6.0:
+            elif d < 5.0:
                 nx, nz = -dx / d, -dz / d
                 self.x += nx * self.veloc * dt
                 self.z += nz * self.veloc * dt
+            else:
+                pass    
 
             self.atacar_ranged(player, dt)
 

@@ -3,6 +3,7 @@ from OpenGL.GL import *
 import numpy as np
 import math
 
+
 # === Engine ===
 from engine.transformacoes import perspectiva, translacao, escala, rotacaoX, look_at
 from engine.geometrias import criarCubo, criarPlataforma, criarVAO
@@ -15,6 +16,7 @@ from game.plataforma import Plataforma
 from game.rampa import Rampa
 from game.modelo_blocos import ModeloBlocos
 from game.modelo_inimigos import ModeloInimigos
+from game.render_utils import desenhar_flecha
 
 # === Core ===
 from core.renderizador import desenhar
@@ -26,6 +28,73 @@ with open("src/assets/shaders/basic.vert") as f:
 with open("src/assets/shaders/basic.frag") as f:
     FRAG = f.read()
 
+WORLD_OVER = 0
+WORLD_ETER = 1
+WORLD_UNDER = 2
+
+WORLD_CFG = {
+    WORLD_OVER: {
+        "name": "Overworld",
+        "sky": (0.52, 0.80, 0.98),
+        "tint": (1.0, 1.0, 1.0),
+        "spawn": {"melee": 2, "ranged": 1},
+        "melee":  {"hp": 3, "speed": 2.0, "behavior": "chase"},
+        "ranged": {"hp": 2, "speed": 1.5,"behavior": "kite", "fire_cd": 2.2, "burst": 1},
+    },
+    WORLD_ETER: {
+        "name": "Eter",
+        "sky": (0.20, 0.10, 0.35),
+        "tint": (0.75, 0.85, 1.15),
+        "spawn": {"melee": 1, "ranged": 3},
+        "melee":  {"hp": 2, "speed": 3.2, "behavior": "backstab"},
+        "ranged": {"hp": 3, "speed": 2.0, "behavior": "kite_burst", "fire_cd": 1.8, "burst": 2},
+    },
+    WORLD_UNDER: {
+        "name": "Underground",
+        "sky": (0.18, 0.03, 0.03),
+        "tint": (1.15, 0.70, 0.70),
+        "spawn": {"melee": 4, "ranged": 1},
+        "melee":  {"hp": 4, "speed": 1.9, "behavior": "pack_chase"},
+        "ranged": {"hp": 1, "speed": 2.2, "behavior": "opportunist", "fire_cd": 2.5, "burst": 1},
+    },
+}
+
+import random
+
+def set_uTint(programa, tint):
+    loc = glGetUniformLocation(programa, "uTint")
+    glUseProgram(programa)
+    glUniform3f(loc, float(tint[0]), float(tint[1]), float(tint[2]))
+
+def spawn_inimigos_do_mundo(cfg, cor_inim=(0.55,0.20,0.20)):
+    inimigos = []
+    # posições simples pré-definidas pra não nascer em cima do player
+    spawns = [(3,2), (-6,-6), (6,-8), (-8,6), (10,2), (-10,2), (2,-12), (-2,12)]
+    random.shuffle(spawns)
+
+    def make(tipo, pos):
+        x,z = pos
+        e = Inimigo(x, z, cor_inim, tipo)
+        prof = cfg[tipo]
+        # esses campos serão lidos no Inimigo.update()
+        e.hp_max = prof.get("hp", e.hp_max)
+        e.hp = e.hp_max
+        e.veloc = prof.get("speed", e.veloc)
+        e.behavior = prof.get("behavior", "chase")
+        # ranged extras
+        e.cooldown_atk_range = prof.get("fire_cd", getattr(e, "cooldown_atk_range", 1.2))
+        e.burst = prof.get("burst", 1)
+        return e
+
+    n_melee  = cfg["spawn"]["melee"]
+    n_ranged = cfg["spawn"]["ranged"]
+
+    for _ in range(n_melee):
+        inimigos.append(make("melee", spawns.pop()))
+    for _ in range(n_ranged):
+        inimigos.append(make("ranged", spawns.pop()))
+
+    return inimigos
 
 def inimigo_face_para_player(inimigo, player):
     """Face (rot Y) para o inimigo olhar na direção do player."""
@@ -72,6 +141,7 @@ def main():
     madeira = (0.45, 0.28, 0.12)
     corda = (0.95, 0.95, 0.95)
     flecha_cor = (0.85, 0.85, 0.90)
+    pena_cor = (0.95, 0.95, 0.95)
 
     ground_cor = (0.33, 0.60, 0.28)
     plat1_cor = (0.58, 0.42, 0.20)
@@ -106,6 +176,8 @@ def main():
     vao_corda = criarVAO(*criarCubo(corda))
 
     vao_flecha = criarVAO(*criarCubo(flecha_cor))
+    vao_pena = criarVAO(*criarCubo(pena_cor))
+
 
     # =========================
     # MODELOS
@@ -123,10 +195,12 @@ def main():
     ramp = Rampa(0, -7.5, 8, -8, 0, 4, ramp_cor)
 
     player = Player()
-    inimigos = [
-        Inimigo(3, 2, inim_corpo, "melee"),
-        Inimigo(-6, -6, inim_corpo, "ranged"),
-    ]
+    mundo_atual = WORLD_OVER
+    cfg_mundo = WORLD_CFG[mundo_atual]
+
+    set_uTint(programa, cfg_mundo["tint"])
+    inimigos = spawn_inimigos_do_mundo(cfg_mundo, inim_corpo)
+
 
     # =========================
     # INPUT
@@ -134,13 +208,31 @@ def main():
     keys = {}
 
     def key_cb(win, k, s, a, m):
+        nonlocal mundo_atual, cfg_mundo, inimigos
+        
+        # === controle contínuo (movimento) ===
         if a == glfw.PRESS:
             keys[k] = True
-        if a == glfw.RELEASE:
+        elif a == glfw.RELEASE:
             keys[k] = False
+        
+        # === ataque ===
         if k == glfw.KEY_SPACE and a == glfw.PRESS and player.vivo:
             player.ataque = True
             player.temp = 0
+
+        # === troca de mundo (SEM return!) ===
+        if a == glfw.PRESS and k in (glfw.KEY_1, glfw.KEY_2, glfw.KEY_3):
+            if k == glfw.KEY_1:
+                mundo_atual = WORLD_OVER
+            elif k == glfw.KEY_2:
+                mundo_atual = WORLD_ETER
+            elif k == glfw.KEY_3:
+                mundo_atual = WORLD_UNDER
+
+            cfg_mundo = WORLD_CFG[mundo_atual]
+            set_uTint(programa, cfg_mundo["tint"])
+            inimigos = spawn_inimigos_do_mundo(cfg_mundo, inim_corpo)
 
     glfw.set_key_callback(win, key_cb)
 
@@ -161,16 +253,41 @@ def main():
             player.update(dt, keys, plataformas, ramp)
 
         for e in inimigos:
-            e.update(dt, player)
+            # =========================
+            # IA OPORTUNISTA (Inferno)
+            # =========================
+            if mundo_atual == WORLD_UNDER:
+                # verifica se existe melee vivo perto do player
+                melee_perto = False
+                for m in inimigos:
+                    if m.vivo and m.tipo == "melee":
+                        d = math.hypot(m.x - player.x, m.z - player.z)
+                        if d < 2.5:  # distância de "vantagem"
+                            melee_perto = True
+                            break
+
+                # aplica decisão aos rangeds
+                for e in inimigos:
+                    if e.tipo == "ranged":
+                        e.can_shoot = melee_perto
+            else:
+                # fora do inferno, ranged sempre pode atirar
+                for e in inimigos:
+                    if e.tipo == "ranged":
+                        e.can_shoot = True
+            
+            for e in inimigos:
+                e.update(dt, player)
 
         atk = player.espada_box() if player.vivo else None
         if atk:
             for e in inimigos:
-                if e.vivo and colisaoINI(atk, e.aabb()):
-                    e.tomar_dano(1)
+                    if e.vivo and colisaoINI(atk, e.aabb()):
+                        e.tomar_dano(1)
 
 
-        glClearColor(0.52, 0.80, 0.98, 1)
+        sky = cfg_mundo["sky"]
+        glClearColor(float(sky[0]), float(sky[1]), float(sky[2]), 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         cam_eye = np.array([player.x, player.y + 7, player.z + 14], dtype=np.float32)
@@ -221,8 +338,10 @@ def main():
 
             for f in e.flechas_ativas:
                 px, py, pz = float(f["pos"][0]), float(f["pos"][1]), float(f["pos"][2])
-                model_f = translacao(px, py, pz) @ escala(0.30, 0.10, 0.10)
-                desenhar(vao_flecha, model_f, vp, programa)
+                vx, vz = float(f["vel"][0]), float(f["vel"][2])
+                yaw = math.atan2(vx, vz)
+
+                desenhar_flecha(desenhar, programa, vp, px, py, pz, yaw, vao_madeira, vao_metal, vao_pena)
 
 
         # =========================

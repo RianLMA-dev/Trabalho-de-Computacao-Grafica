@@ -29,7 +29,7 @@ class Player:
             self.vida = 0
             self.vivo = False
 
-        self.inv_timer = 0.35  # invencibilidade curta
+        self.inv_timer = 0.80  # invencibilidade curta
 
     def update(self, dt, keys, plats, ramp):
         if not self.vivo:
