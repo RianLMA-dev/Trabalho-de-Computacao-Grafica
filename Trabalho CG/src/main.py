@@ -280,6 +280,10 @@ def main():
             player.ataque = True
             player.temp = 0
 
+        # interação (portal)
+        if k == glfw.KEY_E and a == glfw.PRESS:
+            keys["E_PRESS"] = True
+
         # debug: troca manual (1/2/3)
         if a == glfw.PRESS and k in (glfw.KEY_1, glfw.KEY_2, glfw.KEY_3):
             if k == glfw.KEY_1:
@@ -346,7 +350,18 @@ def main():
 
         mundo_ok = fase.mundo_completo()
         eco_coletavel = (not ecos[mundo_atual]) and mundo_ok
-        portal_ativo = ecos[mundo_atual]
+
+        acabou_de_coletar = False
+        if eco_coletavel and dist_altar < ALTAR_RAIO:
+            ecos[mundo_atual] = True
+            acabou_de_coletar = True
+
+        portal_ativo = ecos[mundo_atual] or acabou_de_coletar
+
+        e_press = keys.pop("E_PRESS", False)
+
+        if portal_ativo and dist_altar < ALTAR_RAIO and e_press:
+            trocar_mundo(proximo_mundo(mundo_atual))
 
         dbg_t += dt
         if dbg_t > 1.0:
@@ -358,11 +373,6 @@ def main():
                   "dist_altar:", round(dist_altar, 2),
                   "playerX:", round(player.x, 2))
 
-        # coleta eco automaticamente ao encostar (simples)
-        if eco_coletavel and dist_altar < ALTAR_RAIO:
-            ecos[mundo_atual] = True
-            portal_ativo = True
-
         # cores por mundo
         if mundo_atual == WORLD_OVER:
             vao_eco = vao_ecoV
@@ -373,10 +383,6 @@ def main():
         else:
             vao_eco = vao_ecoR
             vao_portal = vao_portalV
-
-        # entra no portal (após eco coletado)
-        if portal_ativo and dist_altar < ALTAR_RAIO:
-            trocar_mundo(proximo_mundo(mundo_atual))
 
         # =========================
         # RENDER
