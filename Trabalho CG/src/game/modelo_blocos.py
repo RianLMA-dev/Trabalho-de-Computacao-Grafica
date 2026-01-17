@@ -67,7 +67,7 @@ class ModeloBlocos:
         braco_d_base = base @ translacao(+0.60, 1.30, 0.0) @ rotacaoX(-swing + atk)
 
         # mão: empurra pra frente quando ataca
-        mao = braco_d_base @ translacao(0.0, -0.40, 0.40 + estocada)
+        mao = braco_d_base @ translacao(0.0, -0.40, 0.40 - estocada)
 
 
         # Cabo (madeira) - apontando para frente (Z)

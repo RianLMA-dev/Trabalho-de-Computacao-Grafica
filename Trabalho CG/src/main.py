@@ -68,9 +68,10 @@ def main():
     inim_cabeca = (0.75, 0.75, 0.75)
     inim_arma = (0.85, 0.85, 0.85)
 
-    metal  = (0.85, 0.85, 0.90)
+    metal = (0.85, 0.85, 0.90)
     madeira = (0.45, 0.28, 0.12)
-    corda  = (0.95, 0.95, 0.95)
+    corda = (0.95, 0.95, 0.95)
+    flecha_cor = (0.85, 0.85, 0.90)
 
     ground_cor = (0.33, 0.60, 0.28)
     plat1_cor = (0.58, 0.42, 0.20)
@@ -100,17 +101,17 @@ def main():
     hud_bg = criarVAO(*criarCubo(hud_bg_cor))
     hud_hp = criarVAO(*criarCubo(hud_hp_cor))
 
-    vao_metal   = criarVAO(*criarCubo(metal))
+    vao_metal = criarVAO(*criarCubo(metal))
     vao_madeira = criarVAO(*criarCubo(madeira))
-    vao_corda   = criarVAO(*criarCubo(corda))
+    vao_corda = criarVAO(*criarCubo(corda))
 
+    vao_flecha = criarVAO(*criarCubo(flecha_cor))
 
     # =========================
     # MODELOS
     # =========================
     modelo_player = ModeloBlocos(vao_pele, vao_roupa, vao_bota, vao_det, vao_metal, vao_madeira)
     modelo_inimigos = ModeloInimigos(vao_inim_corpo, vao_inim_cabeca, vao_metal, vao_madeira, vao_corda)
-
 
     # =========================
     # CENÁRIO
@@ -166,7 +167,8 @@ def main():
         if atk:
             for e in inimigos:
                 if e.vivo and colisaoINI(atk, e.aabb()):
-                    e.vivo = False
+                    e.tomar_dano(1)
+
 
         glClearColor(0.52, 0.80, 0.98, 1)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -195,14 +197,15 @@ def main():
             vp, programa
         )
 
-        # Player (modelo em blocos)
-        modelo_player.draw_link(
-            desenhar, programa, vp,
-            player.x, player.y, player.z,
-            player.face, now,
-            andando=player_esta_andando(keys),
-            atacando=player.ataque
-        )
+        # Player (modelo em blocos) - só desenha se vivo
+        if player.vivo:
+            modelo_player.draw_link(
+                desenhar, programa, vp,
+                player.x, player.y, player.z,
+                player.face, now,
+                andando=player_esta_andando(keys),
+                atacando=player.ataque
+            )
 
         # Inimigos (modelos em blocos)
         for e in inimigos:
@@ -216,21 +219,48 @@ def main():
             else:
                 modelo_inimigos.draw_ranged(desenhar, programa, vp, e.x, e.y, e.z, face)
 
-        # HUD VIDA
+            for f in e.flechas_ativas:
+                px, py, pz = float(f["pos"][0]), float(f["pos"][1]), float(f["pos"][2])
+                model_f = translacao(px, py, pz) @ escala(0.30, 0.10, 0.10)
+                desenhar(vao_flecha, model_f, vp, programa)
+
+
+        # =========================
+        # HUD VIDA (fixo na câmera)
+        # =========================
         frac = 0.0
         if player.vida_max > 0:
             frac = max(0.0, min(1.0, player.vida / player.vida_max))
 
-        hud_x = cam_eye[0] - 6.5
-        hud_y = cam_eye[1] + 3.5
-        hud_z = cam_eye[2] - 10.0
+        forward = cam_tgt - cam_eye
+        norm = np.linalg.norm(forward)
+        if norm < 1e-6:
+            forward = np.array([0, 0, -1], dtype=np.float32)
+        else:
+            forward = forward / norm
 
-        desenhar(hud_bg, translacao(hud_x, hud_y, hud_z) @ escala(4.0, 0.3, 0.2), vp, programa)
-        desenhar(
-            hud_hp,
-            translacao(hud_x - (2.0 * (1 - frac)), hud_y, hud_z) @ escala(4.0 * frac, 0.25, 0.18),
-            vp, programa
-        )
+        up = np.array([0, 1, 0], dtype=np.float32)
+        right = np.cross(forward, up)
+        rnorm = np.linalg.norm(right)
+        if rnorm < 1e-6:
+            right = np.array([1, 0, 0], dtype=np.float32)
+        else:
+            right = right / rnorm
+
+        hud_pos = cam_eye + forward * 6.0 + right * (-3.4) + up * (2.70)
+
+        glDisable(GL_DEPTH_TEST)
+
+        # fundo
+        model = translacao(float(hud_pos[0]), float(hud_pos[1]), float(hud_pos[2])) @ escala(2.8, 0.18, 0.12)
+        desenhar(hud_bg, model, vp, programa)
+
+        # vida
+        hp_pos = hud_pos + right * (-(1.4) * (1 - frac))
+        model = translacao(float(hp_pos[0]), float(hp_pos[1]), float(hp_pos[2])) @ escala(2.8 * frac, 0.14, 0.10)
+        desenhar(hud_hp, model, vp, programa)
+
+        glEnable(GL_DEPTH_TEST)
 
         glfw.swap_buffers(win)
 

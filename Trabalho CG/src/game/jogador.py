@@ -75,3 +75,11 @@ class Player:
         sz = self.z + dz
         sy = self.y
         return (sx-0.3, sy-0.2, sz-0.3, sx+0.3, sy+0.2, sz+0.3)
+    
+    def aabb(self):
+        # caixa do player (ajuste fino se quiser)
+        # tam = 1 => half = 0.5
+        half = 0.5
+        return (self.x-half, self.y-half, self.z-half,
+                self.x+half, self.y+half, self.z+half)
+
